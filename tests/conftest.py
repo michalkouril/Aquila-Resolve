@@ -1,6 +1,45 @@
 # Fixtures for dictionary setup
+import os
 import pytest
 import unittest.mock as mock
+
+try:
+    import pytest_mock  # noqa: F401
+except Exception:  # pragma: no cover - fallback when pytest-mock isn't installed
+    class _PatchProxy:
+        def __init__(self, parent):
+            self._parent = parent
+
+        def __call__(self, *args, **kwargs):
+            return self._parent._start_patch(mock.patch, *args, **kwargs)
+
+        def object(self, *args, **kwargs):
+            return self._parent._start_patch(mock.patch.object, *args, **kwargs)
+
+    class _Mocker:
+        MagicMock = mock.MagicMock
+        Mock = mock.Mock
+
+        def __init__(self):
+            self._patches = []
+            self.patch = _PatchProxy(self)
+
+        def _start_patch(self, patch_func, *args, **kwargs):
+            p = patch_func(*args, **kwargs)
+            started = p.start()
+            self._patches.append(p)
+            return started
+
+        def stopall(self):
+            for p in reversed(self._patches):
+                p.stop()
+            self._patches.clear()
+
+    @pytest.fixture
+    def mocker():
+        m = _Mocker()
+        yield m
+        m.stopall()
 from Aquila_Resolve import dictionary
 from Aquila_Resolve.h2p import H2p
 from Aquila_Resolve import download
@@ -37,7 +76,9 @@ file_mock_content = """
 
 # Setup to ensure model is downloaded
 def pytest_sessionstart(session):
-    assert download() is True
+    # Avoid network in default test runs. Set AQUILA_RESOLVE_TEST_DOWNLOAD=1 to enable.
+    if os.getenv("AQUILA_RESOLVE_TEST_DOWNLOAD") == "1":
+        assert download() is True
 
 
 # noinspection PyUnusedLocal
