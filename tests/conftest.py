@@ -1,7 +1,15 @@
 # Fixtures for dictionary setup
 import os
+import sys
+from pathlib import Path
 import pytest
 import unittest.mock as mock
+
+# Ensure local src/ is used instead of any installed package.
+_ROOT = Path(__file__).resolve().parents[1]
+_SRC = _ROOT / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
 try:
     import pytest_mock  # noqa: F401
@@ -79,6 +87,24 @@ def pytest_sessionstart(session):
     # Avoid network in default test runs. Set AQUILA_RESOLVE_TEST_DOWNLOAD=1 to enable.
     if os.getenv("AQUILA_RESOLVE_TEST_DOWNLOAD") == "1":
         assert download() is True
+
+
+def pytest_collection_modifyitems(config, items):
+    # If no model is available and downloads are disabled, skip model-dependent tests.
+    if os.getenv("AQUILA_RESOLVE_TEST_DOWNLOAD") == "1":
+        return
+    try:
+        from Aquila_Resolve.data import DATA_PATH
+    except Exception:
+        return
+    if (DATA_PATH / "model.pt").exists():
+        return
+    skip = pytest.mark.skip(
+        reason="Model checkpoint not available. Set AQUILA_RESOLVE_TEST_DOWNLOAD=1 to enable download."
+    )
+    for item in items:
+        if item.fspath and item.fspath.basename in {"test_g2p.py", "test_processors.py"}:
+            item.add_marker(skip)
 
 
 # noinspection PyUnusedLocal

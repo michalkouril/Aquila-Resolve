@@ -189,7 +189,7 @@ def load_checkpoint(
     """
 
     device = torch.device(device)
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model_type = checkpoint["config"]["model"]["type"]
     model_type = ModelType(model_type)
     model = create_model(model_type, config=checkpoint["config"])
